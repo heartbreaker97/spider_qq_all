@@ -7,11 +7,17 @@ import threading
 import queue
 import time
 import DB
+import configparser
 
 #切换qq
 def change_qq(i):
+    #读取小号的个数
+    conf = configparser.ConfigParser()
+    conf.read('config.ini')
+    count = conf.get('qq', 'qq_count')
     global cookie,spider
-    if i > 1:
+    #如果大于个数，那么从头开始
+    if i > count:
         i = 0
     with open('cookie_dict' + str(i) + '.txt', 'r') as f:
         cookie = json.load(f)
