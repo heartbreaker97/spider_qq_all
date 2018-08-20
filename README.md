@@ -12,7 +12,7 @@
     mysql版本 -> mysql5.7
     pip版本 -> pip3
 
-##代码运行流程
+## 代码运行流程
 >1. 修改配置文件config.ini的配置
 >2. 运行cookie.py，生成cookie文件
 >3. 运行spider.py，爬取数据
