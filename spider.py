@@ -8,6 +8,21 @@ import queue
 import time
 import DB
 
+#切换qq
+def change_qq(i):
+    global cookie,spider
+    if i > 1:
+        i = 0
+    with open('cookie_dict' + str(i) + '.txt', 'r') as f:
+        cookie = json.load(f)
+    print('我换个cookie啦')
+    spider.g_tk = spider.get_gtk()
+    spider.uin = spider.get_uin()
+    tmp = i+1
+    t = threading.Timer(300, change_qq,[tmp])
+    t.start()
+
+#爬虫类
 class Spider:
     #初始化
     def __init__(self):
@@ -37,7 +52,6 @@ class Spider:
         data_encode = urllib.parse.urlencode(data)
         url += data_encode
         res = requests.get(url, headers=header, cookies=cookie)
-        time.sleep(1)
         # 踩坑，这里必须加不然会乱码！！！！çŸ³å®¶åº„å想这样子的乱码！
         res.encoding = 'UTF-8'
         try:
@@ -166,8 +180,6 @@ class Spider:
                     if len(already_exits) > 50000:
                         already_exits = []
                     new_qq.put([like['fuin'], qq[1], qq[0]])
-                '''else:
-                    print(str(like['fuin']) + '重复了')'''
         except Exception as e:
             print('获取说说点赞信息失败，错误信息为：'+str(e))
 
@@ -177,11 +189,6 @@ class Spider:
 
     #写入数据库队列，等积累到一定的量再批量写入数据库
     def write_infor(self,qq):
-        #判断该qq的信息是否已经得到了
-        '''if qq[0] in already_exits:
-            print(str(qq[0])+ '重复了')
-            return 0
-        already_exits.append(qq[0])'''
         # 写入基本信息到入库队列中
         url_infor = 'https://h5.qzone.qq.com/proxy/domain/base.qzone.qq.com/cgi-bin/user/cgi_userinfo_get_all?'
         data_infor = {
@@ -272,7 +279,7 @@ class Spider:
         #从该qq获得其他qq，想办法把这个从这里分离，提高并发性
         self.get_others_qq(qq)
 
-        #如果等待队列中少于200个，那么就从新获取qq队列中出队400，再入队到等待队列中
+        #如果等待队列中少于200个，那么就从新获取qq队列中出队500，再入队到等待队列中
         #为了控制多线程重复加值，应该要顺序读值，则需要加上锁更好
         #刚开始因为新qq队列里面没有，所以，刚开始还是会重复加值
         mutex = threading.Lock()
@@ -284,7 +291,7 @@ class Spider:
                     except Exception as e:
                         print('从新获得qq队列出队失败，错误信息为:'+str(e))
 
-            #避免等待队列过大：
+            #避免等待队列过长，超过一定值那么全部出队：
             if new_qq.qsize() > 50000:
                 print('我要插入了')
                 for i in range(new_qq.qsize()):
@@ -293,6 +300,7 @@ class Spider:
             mutex.release()
         '''print('等待队列大小'+str(waiting_get.qsize()))
         print('新队列大小' + str(new_qq.qsize()))'''
+
 
     #开始入口
     def start(self):
@@ -308,7 +316,7 @@ class Spider:
             wating_qq_list = []
             for i in range(waiting_get.qsize()):
                 wating_qq_list.append(waiting_get.get())
-            pool_size = 17
+            pool_size = 20
             pool = threadpool.ThreadPool(pool_size)
             # 创建工作请求
             reqs = threadpool.makeRequests(self.get_data, wating_qq_list)
@@ -317,17 +325,18 @@ class Spider:
             pool.wait()
 
 if __name__ == '__main__':
-    #读取cookie
-    with open('cookie_dict.txt','r') as f:
-        cookie = json.load(f)
-
-    #假装是浏览器
+    # 假装是浏览器
     header = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64; rv:61.0) Gecko/20100101 Firefox/61.0",
         "Accepted-Language": "zh-CN,zh;q=0.8,en-US;q=0.5,en;q=0.3",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
     }
+    #先拿出自己的cookie
+    with open('cookie_dict0.txt', 'r') as f:
+        cookie = json.load(f)
     spider = Spider()
+    #然后再定时切换cookie
+    change_qq(0)
     #初始化一个list,用来判断已经写到数据库没
     already_exits = []
     #初始化三种队列，等待获取信息队列，新获得qq队列，等待写入数据库队列
@@ -336,4 +345,3 @@ if __name__ == '__main__':
     infor_insert_db = queue.Queue()
     topic_insert_db = queue.Queue()
     spider.start()
-    #spider.get_friend()
