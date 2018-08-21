@@ -17,7 +17,7 @@ def change_qq(i):
     count = conf.get('qq', 'qq_count')
     global cookie,spider
     #如果大于个数，那么从头开始
-    if i > count:
+    if i > int(count):
         i = 0
     with open('cookie_dict' + str(i) + '.txt', 'r') as f:
         cookie = json.load(f)
@@ -25,7 +25,7 @@ def change_qq(i):
     spider.g_tk = spider.get_gtk()
     spider.uin = spider.get_uin()
     tmp = i+1
-    t = threading.Timer(300, change_qq,[tmp])
+    t = threading.Timer(180, change_qq,[tmp])
     t.start()
 
 #爬虫类
@@ -132,29 +132,17 @@ class Spider:
                 return 0
             page += 1
             #通过点赞得到该qq的好友
-            mutex = threading.Lock()
-            if mutex.acquire():
-                try:
-                    for m in msg['msglist']:
-                        self.get_qq_others_by_like(m,qq_list, qq)
-                        #将说说记录到插入队列中
-                        try:
-                            topic_insert_db.put((m['content'],self.transfer_time(m['created_time']), m['uin']))
-                        except Exception as e:
-                            print('获取说说失败, '+ str(e))
+            try:
+                for m in msg['msglist']:
+                    self.get_qq_others_by_like(m,qq_list, qq)
+                    #将说说记录到插入队列中
+                    try:
+                        topic_insert_db.put((m['content'],self.transfer_time(m['created_time']), m['uin']))
+                    except Exception as e:
+                        print('获取说说失败, '+ str(e))
 
-                        #用第一条信息更新数据表
-                        if is_first:
-                            db = DB.Db()
-                            db.update_infor(m['content'], m['source_name'], m['uin'])
-                            db.commit()
-                            db.close()
-                            is_first = False
-
-                except Exception as e:
-                    print('读取好友说说错误，错误信息为：'+str(e))
-                finally:
-                    mutex.release()
+            except Exception as e:
+                print('读取好友说说错误，错误信息为：'+str(e))
             print('现在是第' + str(qq[1]) + '层 的好友: ' + str(qq[0]))
 
 
@@ -184,6 +172,7 @@ class Spider:
                 if like['fuin'] not in already_exits:
                     already_exits.append(like['fuin'])
                     if len(already_exits) > 50000:
+                        print('已经插入了' + str(len(already_exits)))
                         already_exits = []
                     new_qq.put([like['fuin'], qq[1], qq[0]])
         except Exception as e:
@@ -222,11 +211,9 @@ class Spider:
                     'sex': r['data']['sex'],
                     'nick_name': r['data']['nickname'],
                     'qzone_name': r['data']['spacename'],
-                    'last_message': '',
                     'ptime': self.transfer_time(r['data']['ptimestamp']),
                     'birth_year': r['data']['birthyear'],
                     'birth_day': r['data']['birthday'],
-                    'tool': '',
                     'province': r['data']['province'],
                     'city': r['data']['city'],
                     'hp': r['data']['hp'],
@@ -252,7 +239,7 @@ class Spider:
             print('现在等待插入队列长度 '+ str(infor_insert_db.qsize()))
             db = DB.Db()
             for i in range(5):
-                infor = infor_insert_db.get()
+                infor = infor_insert_db.get(block=True,timeout=2)
                 values = ()
                 for item in infor[0].items():
                     #变成元组
@@ -263,11 +250,11 @@ class Spider:
         if topic_insert_db.qsize() > 100:
             print('现在说说等待插入队列长度 ' + str(topic_insert_db.qsize()))
             db = DB.Db()
-            for i in range(100):
-                topic = topic_insert_db.get()
+            for i in range(topic_insert_db.qsize()):
+                topic = topic_insert_db.get(block=True,timeout=2)
                 values = ()
                 for data in topic:
-                    # 变成元组
+                    #变成元组
                     values += (data,)
                 db.insert_topic(values)
             db.commit()
@@ -279,7 +266,12 @@ class Spider:
     def get_data(self,qq):
         #层次在在这里加上，因为这是从一个好友扩展出来的qq，层次+1
         qq[1] += 1
-
+        '''t1 = threading.Thread(target=self.write_infor,args=(qq,))
+        t2 = threading.Thread(target=self.get_others_qq(), args=(qq,))
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()'''
         #将该qq的信息写到入库队列中
         self.write_infor(qq)
         #从该qq获得其他qq，想办法把这个从这里分离，提高并发性
@@ -293,16 +285,16 @@ class Spider:
             if waiting_get.qsize() < 200 and new_qq.qsize() > 500:
                 for i in range(500):
                     try:
-                        waiting_get.put(new_qq.get())
+                        waiting_get.put(new_qq.get(block=True,timeout=2))
                     except Exception as e:
                         print('从新获得qq队列出队失败，错误信息为:'+str(e))
 
             #避免等待队列过长，超过一定值那么全部出队：
-            if new_qq.qsize() > 50000:
+            if new_qq.qsize() > 5000:
+                print('要插入全部的时候新qq队列' + str(new_qq.qsize()))
                 print('我要插入了')
                 for i in range(new_qq.qsize()):
                     waiting_get.put(new_qq.get())
-
             mutex.release()
         '''print('等待队列大小'+str(waiting_get.qsize()))
         print('新队列大小' + str(new_qq.qsize()))'''
@@ -329,6 +321,7 @@ class Spider:
             # 将工作请求放入队列
             [pool.putRequest(req) for req in reqs]
             pool.wait()
+            print('新qq队列'+str(new_qq.qsize()))
 
 if __name__ == '__main__':
     # 假装是浏览器

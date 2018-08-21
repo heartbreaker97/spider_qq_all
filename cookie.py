@@ -1,12 +1,17 @@
 from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 from time import sleep
 import configparser
 import json
+
 
 #chromedriver = 'C:/Users/13180/AppData/Local/Google/Chrome/Application/chromedriver.exe'
 #driver = webdriver.Chrome(chromedriver)
 
 def create_cookie(qqs):
+    # 设置成无头
+    chrome_options = Options()
+    chrome_options.add_argument('--headless')
     for qq in qqs:
         driver = webdriver.Chrome()
         driver.get('https://user.qzone.qq.com/'+str(qq[0])+'/main')
@@ -29,8 +34,9 @@ def create_cookie(qqs):
 def start():
     conf = configparser.ConfigParser()
     conf.read('config.ini')
+    count = conf.get('qq', 'qq_count')
     qqs = []
-    for i in range(6):
+    for i in range(int(count)+1):
         qqs.append([conf.get('qq','name'+str(i)),conf.get('qq','pwd'+str(i)),i])
     create_cookie(qqs)
 if __name__ == '__main__':

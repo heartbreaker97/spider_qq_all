@@ -1,6 +1,7 @@
 import configparser
 import pymysql
-
+from time import sleep
+import threading
 #定义数据操作类
 class Db:
     #数据库连接
@@ -20,10 +21,20 @@ class Db:
             print('数据库连接错误')
         #print(type(con))
 
+    #实现单例模式
+    '''instance = None
+    def __new__(cls, *args, **kwargs):
+        if cls.instance is None:
+            cls.instance = object.__new__(cls, *args, **kwargs)
+        else:
+            sleep(1)
+            cls.instance = object.__new__(cls, *args, **kwargs)
+        return cls.instance'''
+
     #创建数据库表
     def db_create(self):
         #qq用户信息表
-        sql_qq_infor = """CREATE TABLE qq_infor (
+        '''sql_qq_infor = """CREATE TABLE qq_infor (
                     `qq` BIGINT NOT NULL,
                     `parent_qq` BIGINT NOT NULL,
                     `depth` INT NOT NULL,
@@ -41,7 +52,24 @@ class Db:
                     `hp` VARCHAR(10),
                     `hc` VARCHAR(10),
                     `marriage` INT(1),
-                    PRIMARY KEY(`qq`))"""
+                    PRIMARY KEY(`qq`))"""'''
+        sql_qq_infor = """CREATE TABLE qq_infor (
+                            `qq` BIGINT NOT NULL,
+                            `parent_qq` BIGINT NOT NULL,
+                            `depth` INT NOT NULL,
+                            `is_access` INT(1),
+                            `sex` INT(1),
+                            `nick_name` VARCHAR(100),
+                            `qzone_name` VARCHAR(100),
+                            `ptime` DATETIME,
+                            `birth_year` INT,
+                            `birth_day` CHAR(5),
+                            `province` VARCHAR(10),
+                            `city` VARCHAR(10),
+                            `hp` VARCHAR(10),
+                            `hc` VARCHAR(10),
+                            `marriage` INT(1),
+                            PRIMARY KEY(`qq`))"""
         #说说表
         sql_topic = """CREATE TABLE qq_topic (
                    `tid` INT NOT NULL AUTO_INCREMENT,
@@ -76,10 +104,14 @@ class Db:
             self.cursor.execute(sql_insert)
         except Exception as e:
             print('数据插入说说表错误,错误信息为：'+str(e))
-
+    def select(self, table, field):
+        sql_select = """SELECT {field} FROM {table} """.format(field=field,table=table)
+        result = self.cursor.execute(sql_select)
+        return result
     #更新
     def update_infor(self, my_last_message, my_tool,my_qq):
         sql_update = """UPDATE qq_infor SET `last_message`='{last_message}',`tool`='{tool}' WHERE `qq`={qq}""".format(last_message=my_last_message,tool=my_tool,qq=my_qq)
+        #sql_update = """UPDATE qq_infor SET `last_message`='{last_message}',`tool`='{tool} WHERE `qq`='578634631'""".format(last_message=my_last_message, tool=my_tool)
         try:
             self.cursor.execute(sql_update)
         except Exception as e:
