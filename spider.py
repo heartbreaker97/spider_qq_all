@@ -17,7 +17,7 @@ def change_qq(i):
     count = conf.get('qq', 'qq_count')
     global cookie,spider
     #如果大于个数，那么从头开始
-    if i > count:
+    if i > int(count):
         i = 0
     with open('cookie_dict' + str(i) + '.txt', 'r') as f:
         cookie = json.load(f)
